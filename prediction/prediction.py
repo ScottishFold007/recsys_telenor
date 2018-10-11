@@ -30,6 +30,7 @@ print(t.word_index)
 print(t.word_docs)
 '''
 
+# create binary matrix (not one-hot)
 encoded_docs = t.texts_to_matrix(events, mode='count')
 
 # split data into training and testing
