@@ -61,11 +61,12 @@ print('url set length', url_set_length)
 print('actions set length', action_set_length)
 
 # pad strings to url set to make it same length as action set
+'''
 padding = '-'
 for x in range(action_set_length - url_set_length):
     url_set.add(padding)
     padding += '-'
-
+'''
 # print(url_set)
 
 one_hot_urls = one_hot_encoding(url_set, urls)
