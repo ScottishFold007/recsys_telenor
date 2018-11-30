@@ -110,7 +110,7 @@ def create_dataset():
     train_size = int(0.8 * len(dataset))
     train = dataset[0:train_size]
     test = dataset[train_size:-1]
+
     return train, test, url_action_set_length, url_set_length
     
 
-create_dataset()
