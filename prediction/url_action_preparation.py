@@ -55,8 +55,8 @@ def create_dataset():
     t['uuid_count'] = t.groupby('UUID').UUID.transform('count')
     t = t[t.uuid_count > 1]
 
-    # replace NaN with empty string
-    t.fillna('',inplace=True)
+    # drop rows with NaN 
+    t = t.dropna(axis='rows', how='any',subset=['url', 'action'])
 
     t['url'] = t['url'].apply(lambda x: x.rsplit('?', 1)[0])
 
@@ -72,21 +72,21 @@ def create_dataset():
         t['url'] = t['url'].apply(lambda x: k if x.find(k) != -1 else x)
 
     
-    url_set = set(t['url'])
+    url_set = list(set(t['url']))
+    url_set.insert(0,'ZERO PADDING')
     action_set = set(t['action'])
 
     url_set_length = len(url_set)
     action_set_length = len(action_set)
     
     t['url_action'] = t[['url', 'action']].apply(lambda x: ' '.join(x), axis=1)
-    url_action_set = set(t['url_action'])
+    url_action_set = list(set(t['url_action']))
+    url_action_set.insert(0,'ZERO PADDING')
     url_action_set_length = len(url_action_set)
     
     url_action_indices = integer_encode(url_action_set, t['url_action'])
     url_indices = integer_encode(url_set, t['url'])
     t = t.assign(url_index=url_indices)
-
-    
     t = t.assign(url_action_index=url_action_indices)
 
     longest_session = len(t.groupby('UUID').max())
@@ -113,4 +113,4 @@ def create_dataset():
 
     return train, test, url_action_set_length, url_set_length
     
-
+create_dataset()
