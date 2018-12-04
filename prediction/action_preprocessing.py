@@ -4,6 +4,8 @@ import pandas as pd
 from datetime import datetime as dt
 import torch
 import uuid 
+import spacy
+import en_core_web_sm
 
 t = pickle.load( open( "data_set.p", "rb" ) )
 
@@ -51,5 +53,14 @@ for k in api_keywords:
 url_set = set(t['url'])
 action_set = set(t['action'])
 
+'''
 for a in action_set:
     print(a)
+'''
+
+a = 'click on 10503513'
+nlp = en_core_web_sm.load() 
+doc = nlp(a)
+ents = [ent for ent in list(doc.ents) if ent.label_ != 'DATE']
+print(ents)
+#print([(X.text, X.label_) for X in doc.ents])
