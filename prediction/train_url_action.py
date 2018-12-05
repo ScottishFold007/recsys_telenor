@@ -34,16 +34,23 @@ def test_accuracy(model, x, y, session_size, batch_size, url_set_length, device)
     return accuracy/batch_size
 
 def train(model, x, y, loss_function, optimizer, session_size, batch_size, url_set_length, decive):
-    model.zero_grad()
-    loss = 0.0
-    hidden = None
     inputs = x.to(device)
     targets = y.to(device)
-    output, _ = model(inputs, hidden)
+    output, _ = model(inputs, None)
     output = output.view(batch_size, url_set_length, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
-    loss = loss_function(output, targets)
-    loss.backward()
-    optimizer.step()
+    #loss = loss_function(output, targets)
+    #loss.backward()
+    #optimizer.step()
+    out = output.view(batch_size, session_size, url_set_length)
+    #print(out.shape)
+    #print(targets.shape)
+    for o_batch, t_batch in zip(out, targets):
+        for o_events, t_event in zip(o_batch, t_batch):
+            model.zero_grad()
+            loss = loss_function(o_events.unsqueeze(0), t_event.unsqueeze(0))
+            loss.backward(retain_graph=True)
+            optimizer.step()
+    loss.backward(retain_graph=False)
 
     # accuracy
     prediction = torch.argmax(output, dim=1)
@@ -68,7 +75,7 @@ print('test size',len(test_data))
 session_size = len(train_data[0][0])
 print('session size',session_size)
 
-n_iters = 300
+n_iters = 100
 print_every = 5
 test_every = 10
 train_loss = []
