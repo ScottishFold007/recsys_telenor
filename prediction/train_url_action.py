@@ -33,7 +33,7 @@ def test_accuracy(model, x, y, session_size, batch_size, url_set_length, device)
     del targets
     return accuracy/batch_size
 
-def train(model, x, y, loss_function, optimizer, session_size, batch_size, url_set_length, decive):
+def train(model, x, y, loss_function, optimizer, session_size, batch_size, url_set_length, device):
     inputs = x.to(device)
     targets = y.to(device)
     output, _ = model(inputs, None)
@@ -44,23 +44,24 @@ def train(model, x, y, loss_function, optimizer, session_size, batch_size, url_s
     out = output.view(batch_size, session_size, url_set_length)
     #print(out.shape)
     #print(targets.shape)
+    batch_loss = 0.0
     for o_batch, t_batch in zip(out, targets):
         for o_events, t_event in zip(o_batch, t_batch):
             model.zero_grad()
             loss = loss_function(o_events.unsqueeze(0), t_event.unsqueeze(0))
             loss.backward(retain_graph=True)
             optimizer.step()
+            batch_loss += loss.item()
     loss.backward(retain_graph=False)
-
     # accuracy
     prediction = torch.argmax(output, dim=1)
     num_correct = torch.sum(prediction == targets)
     accuracy = num_correct.item()/session_size
-
+    del loss
     del inputs 
     del targets
     del output
-    return loss.item(), accuracy/batch_size
+    return batch_loss, accuracy/batch_size
 
 writer = SummaryWriter('logs') 
 train_data, test_data, url_action_set_length, url_set_length = uap.create_dataset()
@@ -84,7 +85,15 @@ test_accuracies = []
 batch_size = 4
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = Model(url_action_set_length, 10, url_set_length, batch_size, session_size, device)
+
+model = Model(
+    vocabulary_size=url_action_set_length,
+    embedding_size=10,
+    output_size=url_set_length, 
+    minibatch_size=batch_size, 
+    sequence_length=session_size, 
+    device=device)
+
 model.to(device)
 loss_function = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters())
@@ -98,7 +107,17 @@ for i in range(1, n_iters + 1):
     epoch_loss = []
     for j, minibatch in enumerate(train_loader, 0):
         x, y = minibatch
-        loss, accuracy = train(model, x, y, loss_function, optimizer, session_size, batch_size, url_set_length, device)
+        loss, accuracy = train(
+            model=model, 
+            x=x, 
+            y=y, 
+            loss_function=loss_function, 
+            optimizer=optimizer, 
+            session_size=session_size, 
+            batch_size=batch_size, 
+            url_set_length=url_set_length, 
+            device=device)
+
         writer.add_scalar('Train/Loss', loss, train_count)
         writer.add_scalar('Train/Accuracy', accuracy, train_count)
         train_accuracies.append(accuracy)
@@ -112,7 +131,14 @@ for i in range(1, n_iters + 1):
     if i % test_every == 0:
         for j, minibatch in enumerate(test_loader, 0): 
             x, y = minibatch
-            test_acc = test_accuracy(model, x, y, session_size, batch_size, url_set_length, device)
+            test_acc = test_accuracy(
+                model=model, 
+                x=x, 
+                y=y, 
+                session_size=session_size, 
+                batch_size=batch_size, 
+                url_set_length=url_set_length, 
+                device=device)
             test_accuracies.append(test_acc)
             writer.add_scalar('Test/Accuracy', test_acc, train_count)
             test_count += 1
