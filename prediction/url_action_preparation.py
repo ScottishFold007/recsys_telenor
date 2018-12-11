@@ -31,6 +31,9 @@ def create_dataset():
 
     t = pickle.load( open( "data_set.p", "rb" ) )
 
+     # drop rows with NaN 
+    t = t.dropna(axis='rows', how='any',subset=['url', 'action'])
+
     # define time variables
     t['start_time'] = t['start_time'].apply(lambda x: dt.strptime(str(x), "%Y-%m-%d %H:%M:%S:%f"))
     t['start_time'] = t['start_time'].apply(lambda x: x.replace(microsecond=0))
@@ -54,9 +57,6 @@ def create_dataset():
     # drop all sessions with 1 event (since they are duplicates)
     t['uuid_count'] = t.groupby('UUID').UUID.transform('count')
     t = t[t.uuid_count > 1]
-
-    # drop rows with NaN 
-    t = t.dropna(axis='rows', how='any',subset=['url', 'action'])
 
     t['url'] = t['url'].apply(lambda x: x.rsplit('?', 1)[0])
 
@@ -89,28 +89,32 @@ def create_dataset():
     t = t.assign(url_index=url_indices)
     t = t.assign(url_action_index=url_action_indices)
 
-    longest_session = len(t.groupby('UUID').max())
     dataset = []
     for uuid, row in t.groupby('UUID'):
+        print(len(row))
         url_action = row['url_action_index'].values
         urls = row['url_index'].values
 
-        pad = np.full((longest_session - len(row)),0)
-        url_action = np.concatenate((url_action,pad))
-        urls = np.concatenate((urls,pad))
-
         target_urls = create_target(urls)
 
-
-        url_action_tensor = torch.from_numpy(url_action)
-        target_tensor = torch.from_numpy(target_urls)
-        dataset.append((url_action_tensor,target_tensor))
+        #url_action_tensor = torch.from_numpy(url_action)
+        #target_tensor = torch.from_numpy(target_urls)
+        dataset.append((url_action,target_urls))
 
     # split data into training and testing
     train_size = int(0.8 * len(dataset))
     train = dataset[0:train_size]
     test = dataset[train_size:-1]
 
+    train.sort(key = lambda s: len(s[0]))
+    test.sort(key = lambda s: len(s[0]))
+
     return train, test, url_action_set_length, url_set_length
-    
-create_dataset()
+
+'''  
+train, test, url_action_set_length, url_set_length = create_dataset()
+
+print("train")
+for t in train:
+    print(t)
+'''
