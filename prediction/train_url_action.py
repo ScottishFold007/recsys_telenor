@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import time
 import matplotlib.pyplot as plt
 import math
+import numpy as np
 from tensorboardX import SummaryWriter
 
 from url_action_model import Model
@@ -19,49 +20,54 @@ def timeSince(since):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
-def test_accuracy(model, x, y, session_size, batch_size, url_set_length, device):
+def test_accuracy(model, x, y, batch_size, url_set_length, device):
+    session_size = x.shape[1]
     inputs = x.to(device)
     targets = y.to(device)
     output, _ = model(inputs, None)
     output = output.view(batch_size, url_set_length, session_size)
-
-    # accuracy
-    prediction = torch.argmax(output, dim=1)
-    num_correct = torch.sum(prediction == targets)
-    accuracy = num_correct.item()/session_size
+    accuracy = calc_accuracy(output, targets, session_size, batch_size)
     del inputs
     del targets
-    return accuracy/batch_size
+    return accuracy
 
-def train(model, x, y, loss_function, optimizer, session_size, batch_size, url_set_length, device):
+def calc_accuracy(output_distribution, targets, session_size, batch_size):
+    prediction = torch.argmax(output_distribution, dim=1)
+    mask = targets != 0
+    correct_with_padding = prediction == targets
+    correct_class = mask * correct_with_padding
+    num_correct = torch.sum(correct_class)
+    return (num_correct.item()/session_size)/batch_size
+
+def train(model, x, y, loss_function, optimizer, batch_size, url_set_length, device):
+    session_size = x.shape[1]
     inputs = x.to(device)
     targets = y.to(device)
     output, _ = model(inputs, None)
     output = output.view(batch_size, url_set_length, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
-    #loss = loss_function(output, targets)
-    #loss.backward()
-    #optimizer.step()
-    out = output.view(batch_size, session_size, url_set_length)
-    #print(out.shape)
-    #print(targets.shape)
-    batch_loss = 0.0
-    for o_batch, t_batch in zip(out, targets):
-        for o_events, t_event in zip(o_batch, t_batch):
-            model.zero_grad()
-            loss = loss_function(o_events.unsqueeze(0), t_event.unsqueeze(0))
-            loss.backward(retain_graph=True)
-            optimizer.step()
-            batch_loss += loss.item()
-    loss.backward(retain_graph=False)
-    # accuracy
-    prediction = torch.argmax(output, dim=1)
-    num_correct = torch.sum(prediction == targets)
-    accuracy = num_correct.item()/session_size
-    del loss
+    loss = loss_function(output, targets)
+    loss.backward()
+    optimizer.step()
+
+    train_accuracy = calc_accuracy(output, targets, session_size, batch_size)
     del inputs 
     del targets
     del output
-    return batch_loss, accuracy/batch_size
+    return loss.item(), train_accuracy
+
+def pad_minibatch(minibatch):
+    max_len = max(len(s[0]) for s in minibatch)
+    sequences = [] 
+    targets = []
+    #print(minibatch[1])
+    for seq, target in minibatch:
+        pad = np.full((max_len - len(seq)),0)
+        seq = np.concatenate((seq,pad)) 
+        target = np.concatenate((target,pad)) 
+        sequences.append(seq)
+        targets.append(target)
+    return torch.LongTensor(sequences), torch.LongTensor(targets) 
+    
 
 writer = SummaryWriter('logs') 
 train_data, test_data, url_action_set_length, url_set_length = uap.create_dataset()
@@ -73,12 +79,10 @@ print('url action set length',url_action_set_length)
 print('url set length',url_set_length)
 print('training size',len(train_data))
 print('test size',len(test_data))
-session_size = len(train_data[0][0])
-print('session size',session_size)
 
-n_iters = 100
+n_iters = 1
 print_every = 5
-test_every = 10
+test_every = 1
 train_loss = []
 train_accuracies = []
 test_accuracies = []
@@ -91,15 +95,14 @@ model = Model(
     embedding_size=10,
     output_size=url_set_length, 
     minibatch_size=batch_size, 
-    sequence_length=session_size, 
     device=device)
 
 model.to(device)
 loss_function = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters())
 
-train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
-test_loader = torch.utils.data.DataLoader(testing_dataset, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
+train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
+test_loader = torch.utils.data.DataLoader(testing_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
 train_count = 0
 test_count = 0
 start = time.time()
@@ -113,7 +116,6 @@ for i in range(1, n_iters + 1):
             y=y, 
             loss_function=loss_function, 
             optimizer=optimizer, 
-            session_size=session_size, 
             batch_size=batch_size, 
             url_set_length=url_set_length, 
             device=device)
@@ -124,6 +126,7 @@ for i in range(1, n_iters + 1):
         epoch_loss.append(loss)
         train_count += 1
     train_loss.append(epoch_loss)
+    
 
     if i % print_every == 0:
         print('%s (%d %d%%) %.4f %.4f' % (timeSince(start), i, i / n_iters * 100, sum(epoch_loss), accuracy))
@@ -135,7 +138,6 @@ for i in range(1, n_iters + 1):
                 model=model, 
                 x=x, 
                 y=y, 
-                session_size=session_size, 
                 batch_size=batch_size, 
                 url_set_length=url_set_length, 
                 device=device)
