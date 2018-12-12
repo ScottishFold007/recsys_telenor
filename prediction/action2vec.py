@@ -16,10 +16,6 @@ def model_to_CSV(model):
     labels_df = pd.DataFrame(labels)
     tokens_df.to_csv('tokens.csv',sep='\t', index=False, header=None)
     labels_df.to_csv('labels.csv',sep='\t', index=False, header=None)
-    t = pd.read_csv('tokens.csv',sep='\t')
-    l = pd.read_csv('labels.csv',sep='\t')
-    print(t)
-    print(len(l.columns))
 
 t = pickle.load( open( "data_set.p", "rb" ) )
 t = t.dropna(axis='rows', how='any',subset=['url', 'action'])

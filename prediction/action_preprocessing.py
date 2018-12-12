@@ -5,7 +5,8 @@ from datetime import datetime as dt
 import torch
 import uuid 
 import spacy
-#import en_core_web_sm
+import string
+import en_core_web_sm
 #import xx_ent_wiki_sm
 #from spacy.lang.xx import MultiLanguage
 #nlp = MultiLanguage()
@@ -80,13 +81,22 @@ for a in action_set:
 
 t.fillna('',inplace=True)
 nb = spacy.load("nb_dep_ud_sm")
+nlp = en_core_web_sm.load() 
 
+import re 
+regex = re.compile('[%s]' % re.escape(string.punctuation)) 
+
+def clean(action):
+    cleaned = regex.sub(' ', action)
+
+    # remove multiple whitespace
+    return re.sub(' +',' ',cleaned) 
 
 def tag(action):
-    doc = nb(action)
+    doc = nlp(action)
     return [(X.text, X.label_) for X in doc.ents]
 
-
+'''
 #a = 'click on "ULLENSVANG HERAD"'
 a = "Det er kaldt på vinteren i Norge."
 #nlp = en_core_web_sm.load() 
@@ -94,10 +104,9 @@ doc = nb(a)
 print(doc)
 print(doc.ents)
 print([(X.text, X.label_) for X in doc.ents])
+'''
 
-'''
-#nlp = en_core_web_sm.load() 
-t['action entities'] = t['action'].apply(tag)
-t['curr'] = t['action']
+nlp = en_core_web_sm.load() 
+t['action_cleaned'] = t['action'].apply(clean)
+t['action entities'] = t['action_cleaned'].apply(tag)
 print(t)
-'''
