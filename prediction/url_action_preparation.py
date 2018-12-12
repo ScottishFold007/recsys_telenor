@@ -91,7 +91,6 @@ def create_dataset():
 
     dataset = []
     for uuid, row in t.groupby('UUID'):
-        print(len(row))
         url_action = row['url_action_index'].values
         urls = row['url_index'].values
 
