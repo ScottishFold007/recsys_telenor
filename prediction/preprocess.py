@@ -452,46 +452,49 @@ def custom_function3(x):
     else:
         return(x.action_cleaned)
 
-in_path = './../../../'
-t = pd.read_csv(in_path+'splunk_data_180918_telenor.txt',  encoding="ISO-8859-1", dtype={"user_id": int, "visit_id": int, "sequence": int, "start_time":object, "event_duration":float,"url":str, "action":str, "country":str,"user_client":str,"user_client_family":str,"user_experience":str,"user_os":str,"apdex_user_experience":str,"bounce_rate":float,"session_duration":float})
-t.columns = t.columns.str.replace('min_bedrift_event.','')
-t = t[~t.action.isnull()]
+def clean_actions():
+    in_path = './../../../'
+    t = pd.read_csv(in_path+'splunk_data_180918_telenor.txt',  encoding="ISO-8859-1", dtype={"user_id": int, "visit_id": int, "sequence": int, "start_time":object, "event_duration":float,"url":str, "action":str, "country":str,"user_client":str,"user_client_family":str,"user_experience":str,"user_os":str,"apdex_user_experience":str,"bounce_rate":float,"session_duration":float})
+    t.columns = t.columns.str.replace('min_bedrift_event.','')
+    t = t[~t.action.isnull()]
 
-# sub-sample
-t = t.tail(100).reset_index()
+    # sub-sample
+    t = t.tail(100).reset_index()
 
-action = 'click on "PATH"'
-action = 'click on "Search"'
+    action = 'click on "PATH"'
+    action = 'click on "Search"'
 
-t['ind'] = t.action == action
-t['ind'] = t['ind'].astype(int)
+    t['ind'] = t.action == action
+    t['ind'] = t['ind'].astype(int)
 
-t.url = t.url.fillna('placeholder')
+    t.url = t.url.fillna('placeholder')
 
-test = pull_visits_containing_event(t,action)
-# look at examples
-test[['user','sequence','url','action']].sort_values(['user','sequence'])
+    test = pull_visits_containing_event(t,action)
+    # look at examples
+    test[['user','sequence','url','action']].sort_values(['user','sequence'])
 
-# apply manual tagging function - REALLY SLOW :P
-# t['action_cleaned'] = t.apply(custom_function1, axis=1)
-# check which events are untagged and most frequent (candidates for manual tagging)
-# t[t['action_cleaned']=='click_on_other'].action.value_counts()
-########### run in parallel
-t['action_cleaned'] = t.swifter.apply(custom_function1, axis=1)
-# inspect unlassified actions
-t[t['action_cleaned']=='click_on_other'].action.value_counts()
-###########################################################################
-# identify and replace number entities
-
-
-t['action_numbers_repl'] = t.action.swifter.apply(lambda x: process2(x))
-###########################################################################
-# manual tagging 2: extends "action_cleaned" to include actions that contained "numbers"
-t[(t['action_cleaned']=='click_on_other')].action_numbers_repl.value_counts()
+    # apply manual tagging function - REALLY SLOW :P
+    # t['action_cleaned'] = t.apply(custom_function1, axis=1)
+    # check which events are untagged and most frequent (candidates for manual tagging)
+    # t[t['action_cleaned']=='click_on_other'].action.value_counts()
+    ########### run in parallel
+    t['action_cleaned'] = t.swifter.apply(custom_function1, axis=1)
+    # inspect unlassified actions
+    t[t['action_cleaned']=='click_on_other'].action.value_counts()
+    ###########################################################################
+    # identify and replace number entities
 
 
+    t['action_numbers_repl'] = t.action.swifter.apply(lambda x: process2(x))
+    ###########################################################################
+    # manual tagging 2: extends "action_cleaned" to include actions that contained "numbers"
+    t[(t['action_cleaned']=='click_on_other')].action_numbers_repl.value_counts()
 
-t['action_cleaned'] =  t.swifter.apply(custom_function3, axis=1)
-###########################################################################
-# manual tagging 3: extends "action_cleaned" to include other actions with high frequency
-t[(t['action_cleaned']=='click_on_other')].action.value_counts()
+
+
+    t['action_cleaned'] =  t.swifter.apply(custom_function3, axis=1)
+    ###########################################################################
+    # manual tagging 3: extends "action_cleaned" to include other actions with high frequency
+    t[(t['action_cleaned']=='click_on_other')].action.value_counts()
+
+    return t
