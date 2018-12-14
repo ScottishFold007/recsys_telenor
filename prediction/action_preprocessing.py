@@ -11,10 +11,14 @@ import en_core_web_sm
 #from spacy.lang.xx import MultiLanguage
 #nlp = MultiLanguage()
 #from spacy.lang.nb import Norwegian
-#nlp = Norwegian()
+#nlp = Norwegian() 
 
-t = pickle.load( open( "data_set.p", "rb" ) )
-'''
+import preprocess as prep
+
+t = prep.clean_actions()
+
+t = t.dropna(axis='rows', how='any',subset=['url', 'action'])
+
 # define time variables
 t['start_time'] = t['start_time'].apply(lambda x: dt.strptime(str(x), "%Y-%m-%d %H:%M:%S:%f"))
 t['start_time'] = t['start_time'].apply(lambda x: x.replace(microsecond=0))
@@ -53,34 +57,9 @@ t = t[t.uuid_count > 1]
 # removing consecutive duplicate actions
 t['prev_action'] = t.sort_values(['visit_id','start_time']).groupby('visit_id')['action'].shift(1)
 t = t[t.action != t.prev_action]
-print(t)
-#print(len(set(t['UUID'])))
-'''
-'''
-t['url'] = t['url'].apply(lambda x: x.rsplit('?', 1)[0])
-
-# split on last / and take first part of the url if url contains 'subscriptions' or 'tickets' or 'admins' or 'recommendations'
-t['url'] = t['url'].apply(lambda x: x.rsplit('/', 1)[0] if 'subscriptions' or 'tickets' or 'admins' or 'recommendations' in x else x) 
-
-# split on last / and take first part of the url if the url is not an empty string and the last element is digit
-t['url'] = t['url'].apply(lambda x: x.rsplit('/', 1)[0] if x and x[-1].isdigit() else x) 
-
-api_keywords = pd.read_csv('./API_keywords.txt')['keywords']
-
-for k in api_keywords:
-    t['url'] = t['url'].apply(lambda x: k if x.find(k) != -1 else x)
 
 
-url_set = set(t['url'])
-action_set = set(t['action'])
-
-
-for a in action_set:
-    print(a)
-'''
-
-t.fillna('',inplace=True)
-nb = spacy.load("nb_dep_ud_sm")
+#nb = spacy.load("nb_dep_ud_sm")
 nlp = en_core_web_sm.load() 
 
 import re 
@@ -107,6 +86,11 @@ print([(X.text, X.label_) for X in doc.ents])
 '''
 
 nlp = en_core_web_sm.load() 
-t['action_cleaned'] = t['action'].apply(clean)
-t['action entities'] = t['action_cleaned'].apply(tag)
-print(t)
+t['ac'] = t['action_cleaned']
+t['a'] = t['action']
+#t['action_cleaned'] = t['action'].apply(clean)
+#t['action entities'] = t['action_cleaned'].apply(tag)
+
+
+#tt = t[t['action_cleaned']=='click_on_other'].action.unique()
+print(t.action.value_counts().tail(50))
