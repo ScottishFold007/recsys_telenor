@@ -452,22 +452,13 @@ def custom_function3(x):
     else:
         return(x.action_cleaned)
 
-def clean_actions():
-    in_path = './../../../'
-    t = pd.read_csv(in_path+'splunk_data_180918_telenor.txt',  encoding="ISO-8859-1", dtype={"user_id": int, "visit_id": int, "sequence": int, "start_time":object, "event_duration":float,"url":str, "action":str, "country":str,"user_client":str,"user_client_family":str,"user_experience":str,"user_os":str,"apdex_user_experience":str,"bounce_rate":float,"session_duration":float})
-    t.columns = t.columns.str.replace('min_bedrift_event.','')
-    t = t[~t.action.isnull()]
-
-    # sub-sample
-    t = t.tail(100).reset_index()
+def clean_actions(t):
 
     action = 'click on "PATH"'
     action = 'click on "Search"'
 
     t['ind'] = t.action == action
     t['ind'] = t['ind'].astype(int)
-
-    t.url = t.url.fillna('placeholder')
 
     test = pull_visits_containing_event(t,action)
     # look at examples

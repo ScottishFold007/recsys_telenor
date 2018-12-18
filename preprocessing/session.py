@@ -2,11 +2,11 @@ import pickle
 import numpy as np
 import uuid 
 from datetime import datetime as dt
+import pandas as pd
 
 def define_session(df):
 
-    # drop NaN actions or urls
-    df = df.dropna(axis='rows', how='any',subset=['url', 'action'])
+    pd.options.mode.chained_assignment = None
 
     # define time variables
     # define time variables
