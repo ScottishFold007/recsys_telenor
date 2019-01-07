@@ -8,6 +8,7 @@ def define_session(df):
 
     pd.options.mode.chained_assignment = None
 
+
     # define time variables
     # define time variables
     df['start_time'] = df['start_time'].apply(lambda x: dt.strptime(str(x), "%Y-%m-%d %H:%M:%S:%f"))
@@ -33,6 +34,7 @@ def define_session(df):
     cond_login = ((df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/#/') | (df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/') | (df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/mobile-app.html#/')) & ("_load_" in df.action)
     cond = cond_url_not_NaN & ((cond_login & cond_lag_ts_NaN) | cond_inactivity)
     
+
     df['tmp'] = cond.groupby(df.visit_id).cumsum().where(cond, 0).astype(int).replace(to_replace=0, method='ffill')
 
     df['sequence'] = df.groupby(['tmp', 'visit_id']).cumcount() + 1
