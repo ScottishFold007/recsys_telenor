@@ -27,10 +27,12 @@ def define_session(df):
     df['lag_ts'].fillna(df['start_time'],inplace=True) # for the first event in session
     df['inactivity'] = (df['start_time'] - df['lag_ts']) / np.timedelta64(1, 'm')
 
-    cond_inactivity = df.inactivity > 20
-    cond_load = df.action == '_load_'
-    cond_homepage = df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/#/'
-    cond = (cond_load & cond_homepage) | cond_inactivity
+    cond_inactivity = df.inactivity > 30
+    cond_url_not_NaN = df.url is not np.nan
+    cond_lag_ts_NaN = df.lag_ts is np.nan
+    cond_login = ((df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/#/') | (df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/') | (df.url == 'https://www.telenor.no/bedrift/minbedrift/beta/mobile-app.html#/')) & ("_load_" in df.action)
+    cond = cond_url_not_NaN & ((cond_login & cond_lag_ts_NaN) | cond_inactivity)
+    
     df['tmp'] = cond.groupby(df.visit_id).cumsum().where(cond, 0).astype(int).replace(to_replace=0, method='ffill')
 
     df['sequence'] = df.groupby(['tmp', 'visit_id']).cumcount() + 1
