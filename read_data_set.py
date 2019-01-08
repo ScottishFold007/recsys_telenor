@@ -1,10 +1,9 @@
 import pickle
 import pandas as pd 
 
-<<<<<<< HEAD
 in_path = './../../'
 dataset = pd.read_csv(
-    in_path+'splunk_data_180918_telenor.txt',  
+    in_path+'splunk_data_180918_telenor_processed.txt',  
     encoding="ISO-8859-1", 
     dtype={
         "user_id": int, 
@@ -37,12 +36,5 @@ t = t[~t.action.isnull()]
 # drop NaN actions or urls
 t = t.dropna(axis='rows', how='any',subset=['url', 'action'])
 t = t.reset_index()
-=======
-dataset = pd.read_csv("./../../../splunk_data_180918_telenor.txt")
-
-# take last 20 000 items
-# was 200
-t = dataset.tail(3000)
->>>>>>> 308e9e5c99201e7993bc4a19c7c7f38788d41333
 
 pickle.dump( t, open( "data_set.p", "wb" ) )
