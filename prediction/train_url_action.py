@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 from tensorboardX import SummaryWriter
-from sklearn.model_selection import KFold
 
 from url_action_model import Model
 import url_action_preparation as uap 
@@ -21,11 +20,11 @@ def timeSince(since):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
-def test_accuracy(model, x, y, batch_size, url_set_length, device):
+def test_accuracy(model, x, y, sequence_lengths, batch_size, url_set_length, device):
     session_size = x.shape[1]
     inputs = x.to(device)
     targets = y.to(device)
-    output, _ = model(inputs, None)
+    output, _ = model(inputs, sequence_lengths, None)
     output = output.view(batch_size, url_set_length, session_size)
     accuracy = calc_accuracy(output, targets)
     del inputs
@@ -38,13 +37,25 @@ def calc_accuracy(output_distribution, targets):
     correct_with_padding = prediction == targets
     correct_class = mask * correct_with_padding
     num_correct = torch.sum(correct_class)
-    return num_correct.item()/torch.sum(mask).item()
+    return num_correct.item()/torch.sum(mask).item() 
 
-def train_minibatch(model, x, y, loss_function, optimizer, batch_size, url_set_length, device):
+def validation(model, x, y, sequence_lengths, batch_size):
     session_size = x.shape[1]
     inputs = x.to(device)
     targets = y.to(device)
-    output, _ = model(inputs, None)
+    output, _ = model(inputs, sequence_lengths, None)
+    output = output.view(batch_size, url_set_length, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
+    validation_accuracy = calc_accuracy(output, targets)
+    del inputs 
+    del targets
+    del output
+    return validation_accuracy
+
+def train_minibatch(model, x, y, sequence_lengths, loss_function, optimizer, batch_size, url_set_length, device):
+    session_size = x.shape[1]
+    inputs = x.to(device)
+    targets = y.to(device)
+    output, _ = model(inputs, sequence_lengths, None)
     output = output.view(batch_size, url_set_length, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
     loss = loss_function(output, targets)
     loss.backward()
@@ -56,38 +67,44 @@ def train_minibatch(model, x, y, loss_function, optimizer, batch_size, url_set_l
     del output
     return loss.item(), train_accuracy
 
+def minibatch_create_train_and_validation(minibatch):
+    train = minibatch[:-1]
+    validation_set = [minibatch[-1]]
+    train_inputs, train_labels, train_lengths = pad_minibatch(train)
+    validation_inputs, validation_labels, validation_lengths = pad_minibatch(validation_set)
+    return train_inputs, train_labels, train_lengths, validation_inputs, validation_labels, validation_lengths
+
 def pad_minibatch(minibatch):
-    max_len = max(len(s[0]) for s in minibatch)
     sequences = [] 
     targets = []
-    #print(minibatch[1])
+    minibatch.sort(key=lambda x:len(x[0]), reverse=True)
+    sequence_lengths = [len(s[0]) for s in minibatch]
+    max_len = max(sequence_lengths)
     for seq, target in minibatch:
         pad = np.full((max_len - len(seq)),0)
         seq = np.concatenate((seq,pad)) 
         target = np.concatenate((target,pad)) 
         sequences.append(seq)
         targets.append(target)
-    return torch.LongTensor(sequences), torch.LongTensor(targets) 
+    return torch.LongTensor(sequences), torch.LongTensor(targets), sequence_lengths
     
 
 writer = SummaryWriter('logs') 
 train_data, test_data, url_action_set_length, url_set_length = uap.create_dataset()
-#training_dataset = train_dataset.TrainDataset(train_data)
-#testing_dataset = test_dataset.TestDataset(test_data)
-
 
 print('url action set length',url_action_set_length)
 print('url set length',url_set_length)
 print('training size',len(train_data))
 print('test size',len(test_data))
 
-n_iters = 100
+n_iters = 1000
 print_every = 5
 test_every = 1
-train_loss = []
-train_accuracies = []
-test_accuracies = []
-batch_size = 4
+test_batch_size = 4
+train_count = 0
+train_loss_list = []
+train_accuracies_list = []
+validation_accuracies_list = []
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -95,102 +112,80 @@ model = Model(
     vocabulary_size=url_action_set_length,
     embedding_size=10,
     output_size=url_set_length, 
-    minibatch_size=batch_size, 
     device=device)
 
 model.to(device)
-loss_function = nn.CrossEntropyLoss()
+loss_function = nn.CrossEntropyLoss(ignore_index=0) # ignores zero-padding
 optimizer = optim.Adam(model.parameters())
 
-kfold = KFold(n_splits=3)
-#train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
-#test_loader = torch.utils.data.DataLoader(testing_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
-train_count = 0
-test_count = 0
+training_dataset = train_dataset.TrainDataset(train_data)
+testing_dataset = test_dataset.TestDataset(test_data)
+train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=5, collate_fn=minibatch_create_train_and_validation, shuffle=True, num_workers=4, drop_last=True)
+
 start = time.time()
 for i in range(1, n_iters + 1):
+        
+    for j, minibatch in enumerate(train_loader, 0):
+        train_inputs, train_labels, train_lengths, validation_inputs, validation_labels, validation_lengths = minibatch
+        
+        # training
+        training_loss, train_accuracy = train_minibatch(
+            model=model, 
+            x=train_inputs, 
+            y=train_labels, 
+            sequence_lengths=train_lengths,
+            loss_function=loss_function, 
+            optimizer=optimizer, 
+            batch_size=train_inputs.shape[0], 
+            url_set_length=url_set_length, 
+            device=device)
 
-    cv_train_acc = []
-    cv_validation_acc = []
+        writer.add_scalar('Train/Loss', training_loss, train_count)
+        writer.add_scalar('Train/Accuracy', train_accuracy, train_count)
+        train_accuracies_list.append(train_accuracy)
+        train_loss_list.append(training_loss)
 
-    # enumerate splits
-    for train, test in kfold.split(train_data):
-        train_set = [train_data[i] for i in train]
-        validation_set = [train_data[i] for i in test]
+        # validation 
+        validation_accuracy = validation(
+            model=model,
+            x=validation_inputs,
+            y=validation_labels,
+            sequence_lengths=validation_lengths,
+            batch_size=validation_inputs.shape[0]
+        )
 
-        training_dataset = train_dataset.TrainDataset(train_set)
-        validation_dataset = test_dataset.TestDataset(validation_set)
+        writer.add_scalar('Validation/Accuracy', validation_accuracy, train_count)
+        validation_accuracies_list.append(validation_accuracy)
 
-        train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
-        validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
-
-        # training:
-        for j, minibatch in enumerate(train_loader, 0):
-            x, y = minibatch
-            loss, accuracy = train_minibatch(
-                model=model, 
-                x=x, 
-                y=y, 
-                loss_function=loss_function, 
-                optimizer=optimizer, 
-                batch_size=batch_size, 
-                url_set_length=url_set_length, 
-                device=device)
-            cv_train_acc.append(accuracy)
-            writer.add_scalar('Train/Loss', loss, train_count)
-            #writer.add_scalar('Train/Accuracy', accuracy, train_count)
-            #train_accuracies.append(accuracy)
-            train_loss.append(loss)
-            train_count += 1
-    
-        # validation
-        for j, minibatch in enumerate(validation_loader, 0): 
-            x, y = minibatch
-            test_acc = test_accuracy(
-                model=model, 
-                x=x, 
-                y=y, 
-                batch_size=batch_size, 
-                url_set_length=url_set_length, 
-                device=device)
-            cv_validation_acc.append(accuracy)
-            #test_accuracies.append(test_acc)
-            #writer.add_scalar('Test/Accuracy', test_acc, train_count)
-            test_count += 1
-    
-    epoch_train_acc = sum(cv_train_acc)/len(cv_train_acc)
-    epoch_validation_acc = sum(cv_validation_acc)/len(cv_validation_acc)
-    train_accuracies.append(epoch_train_acc)
-    test_accuracies.append(epoch_validation_acc)
-    writer.add_scalar('Train/Accuracy', epoch_train_acc, i)
-    writer.add_scalar('Validation/Accuracy', epoch_validation_acc, i)
+        train_count += 1
 
     if i % print_every == 0:
         print('%s (%d %d%%)' % (timeSince(start), i, i / n_iters * 100))
 
 # Test accuracy
 testing_dataset = test_dataset.TestDataset(test_data)
-test_loader = torch.utils.data.DataLoader(testing_dataset, batch_size=batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
-t_acc = []
-for j, minibatch in enumerate(train_loader, 0):
-    x, y = minibatch
-    t = test_accuracy(
+test_loader = torch.utils.data.DataLoader(testing_dataset, batch_size=test_batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
+test_accuracies_list = []
+for j, minibatch in enumerate(test_loader, 0):
+    x, y, sequence_lenghts = minibatch
+    t_acc = test_accuracy(
         model=model, 
         x=x, 
         y=y, 
-        batch_size=batch_size, 
+        sequence_lengths=sequence_lenghts,
+        batch_size=test_batch_size, 
         url_set_length=url_set_length, 
         device=device)
-    t_acc.append(t)
+    test_accuracies_list.append(t_acc)
 
-print('test accuracy:',sum(t_acc)/len(t_acc))
+print('test accuracy:',sum(test_accuracies_list)/len(test_accuracies_list))
 plt.figure()
-plt.plot(test_accuracies)
-plt.savefig('img/test_acc.png')
-plt.plot(train_accuracies)
+plt.plot(train_accuracies_list)
 plt.savefig('img/train_acc.png')
-plt.plot(train_loss)
+plt.plot(train_loss_list)
 plt.savefig('img/loss.png')
+plt.plot(validation_accuracies_list)
+plt.savefig('img/validation_acc.png')
 
 
   
