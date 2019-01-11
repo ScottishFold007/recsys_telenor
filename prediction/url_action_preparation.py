@@ -3,11 +3,15 @@ from datetime import datetime as dt
 import torch
 import numpy as np
 
-
 import sys
 sys.path.insert(0, './../preprocessing')
 import session as ss
 import url_preparation as up
+
+def load_data():
+    t = pickle.load( open( "./../data_set.p", "rb" ) )
+    t = ss.define_session(t)
+    return up.prepare_urls(t)
 
 def integer_encode(vocabulary, data):
     # mapping from urls to int
@@ -22,42 +26,27 @@ def create_target(sequence):
     return np.append(target,[0])
 
 
-def create_dataset():
+def create_dataset(df, input_column, target_column):
     import uuid # TODO: remove ugly hack 
 
-    t = pickle.load( open( "./../data_set.p", "rb" ) )
-
-    t = ss.define_session(t)
-
-    t = up.prepare_urls(t)
+    target_set = list(set(df[target_column]))
+    target_set.insert(0,'ZERO PADDING')
+    target_set_length = len(target_set)
     
-    url_set = list(set(t['url']))
-    url_set.insert(0,'ZERO PADDING')
-    action_set = set(t['action'])
-
-    url_set_length = len(url_set)
-    action_set_length = len(action_set)
+    input_set = list(set(df[input_column]))
+    input_set.insert(0,'ZERO PADDING')
+    input_set_length = len(input_set)
     
-    t['url_action'] = t[['url', 'action']].apply(lambda x: ' '.join(x), axis=1)
-    url_action_set = list(set(t['url_action']))
-    url_action_set.insert(0,'ZERO PADDING')
-    url_action_set_length = len(url_action_set)
-    
-    url_action_indices = integer_encode(url_action_set, t['url_action'])
-    url_indices = integer_encode(url_set, t['url'])
-    t = t.assign(url_index=url_indices)
-    t = t.assign(url_action_index=url_action_indices)
+    input_indices = integer_encode(input_set, df[input_column])
+    target_indices = integer_encode(target_set,df[target_column])
+    df = df.assign(target_index=target_indices)
+    df = df.assign(input_index=input_indices)
 
     dataset = []
-    for uuid, row in t.groupby('UUID'):
-        url_action = row['url_action_index'].values
-        urls = row['url_index'].values
-
-        target_urls = create_target(urls)
-
-        #url_action_tensor = torch.from_numpy(url_action)
-        #target_tensor = torch.from_numpy(target_urls)
-        dataset.append((url_action,target_urls))
+    for uuid, row in df.groupby('UUID'):
+        inputs = row['input_index'].values
+        targets = create_target(row['target_index'].values)
+        dataset.append((inputs,targets))
 
     # split data into training and testing
     train_size = int(0.8 * len(dataset))
@@ -67,12 +56,19 @@ def create_dataset():
     train.sort(key = lambda s: len(s[0]))
     test.sort(key = lambda s: len(s[0]))
 
-    return train, test, url_action_set_length, url_set_length
+    return train, test, input_set_length, target_set_length
 
-'''  
-train, test, url_action_set_length, url_set_length = create_dataset()
+def create_dataset_url_action():
+    t = load_data()
+    t['url_action'] = t[['url_cleaned', 'action']].apply(lambda x: ' '.join(x), axis=1)
+    return create_dataset(t, 'url_action', 'url_cleaned')
 
-print("train")
-for t in train:
-    print(t)
-'''
+def create_dataset_url():
+    t = load_data()
+    return create_dataset(t,'url_cleaned','url_cleaned')
+
+def create_dataset_action():
+    t = load_data()
+    return create_dataset(t,'action','action')
+
+

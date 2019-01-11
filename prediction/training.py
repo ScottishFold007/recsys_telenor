@@ -8,7 +8,7 @@ import math
 import numpy as np
 from tensorboardX import SummaryWriter
 
-from url_action_model import Model
+from lstm_model import Model
 import url_action_preparation as uap 
 import train_dataset 
 import test_dataset
@@ -20,12 +20,12 @@ def timeSince(since):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
-def test_accuracy(model, x, y, sequence_lengths, batch_size, url_set_length, device):
+def test_accuracy(model, x, y, sequence_lengths, batch_size, target_vocabulary_size, device):
     session_size = x.shape[1]
     inputs = x.to(device)
     targets = y.to(device)
     output, _ = model(inputs, sequence_lengths, None)
-    output = output.view(batch_size, url_set_length, session_size)
+    output = output.view(batch_size, target_vocabulary_size, session_size)
     accuracy = calc_accuracy(output, targets)
     del inputs
     del targets
@@ -44,19 +44,19 @@ def validation(model, x, y, sequence_lengths, batch_size):
     inputs = x.to(device)
     targets = y.to(device)
     output, _ = model(inputs, sequence_lengths, None)
-    output = output.view(batch_size, url_set_length, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
+    output = output.view(batch_size, target_vocabulary_size, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
     validation_accuracy = calc_accuracy(output, targets)
     del inputs 
     del targets
     del output
     return validation_accuracy
 
-def train_minibatch(model, x, y, sequence_lengths, loss_function, optimizer, batch_size, url_set_length, device):
+def train_minibatch(model, x, y, sequence_lengths, loss_function, optimizer, batch_size, target_vocabulary_size, device):
     session_size = x.shape[1]
     inputs = x.to(device)
     targets = y.to(device)
     output, _ = model(inputs, sequence_lengths, None)
-    output = output.view(batch_size, url_set_length, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
+    output = output.view(batch_size, target_vocabulary_size, session_size) # according to pytorch CE api input format: (minibatch size, #classes, d)
     loss = loss_function(output, targets)
     loss.backward()
     optimizer.step()
@@ -68,8 +68,9 @@ def train_minibatch(model, x, y, sequence_lengths, loss_function, optimizer, bat
     return loss.item(), train_accuracy
 
 def minibatch_create_train_and_validation(minibatch):
-    train = minibatch[:-1]
-    validation_set = [minibatch[-1]]
+    train_size = int(0.8 * len(minibatch))
+    train = minibatch[0:train_size]
+    validation_set = minibatch[train_size:-1]
     train_inputs, train_labels, train_lengths = pad_minibatch(train)
     validation_inputs, validation_labels, validation_lengths = pad_minibatch(validation_set)
     return train_inputs, train_labels, train_lengths, validation_inputs, validation_labels, validation_lengths
@@ -90,17 +91,17 @@ def pad_minibatch(minibatch):
     
 
 writer = SummaryWriter('logs') 
-train_data, test_data, url_action_set_length, url_set_length = uap.create_dataset()
+train_data, test_data, input_vocabulary_size, target_vocabulary_size = uap.create_dataset_action()
 
-print('url action set length',url_action_set_length)
-print('url set length',url_set_length)
+print('input vocabulary length',input_vocabulary_size)
+print('target vocabulary length',target_vocabulary_size)
 print('training size',len(train_data))
 print('test size',len(test_data))
 
-n_iters = 1000
+n_iters = 5
 print_every = 5
 test_every = 1
-test_batch_size = 4
+test_batch_size = 80
 train_count = 0
 train_loss_list = []
 train_accuracies_list = []
@@ -109,9 +110,9 @@ validation_accuracies_list = []
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 model = Model(
-    vocabulary_size=url_action_set_length,
+    vocabulary_size=input_vocabulary_size,
     embedding_size=10,
-    output_size=url_set_length, 
+    output_size=target_vocabulary_size, 
     device=device)
 
 model.to(device)
@@ -120,7 +121,7 @@ optimizer = optim.Adam(model.parameters())
 
 training_dataset = train_dataset.TrainDataset(train_data)
 testing_dataset = test_dataset.TestDataset(test_data)
-train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=5, collate_fn=minibatch_create_train_and_validation, shuffle=True, num_workers=4, drop_last=True)
+train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=100, collate_fn=minibatch_create_train_and_validation, shuffle=True, num_workers=4, drop_last=True)
 
 start = time.time()
 for i in range(1, n_iters + 1):
@@ -137,7 +138,7 @@ for i in range(1, n_iters + 1):
             loss_function=loss_function, 
             optimizer=optimizer, 
             batch_size=train_inputs.shape[0], 
-            url_set_length=url_set_length, 
+            target_vocabulary_size=target_vocabulary_size, 
             device=device)
 
         writer.add_scalar('Train/Loss', training_loss, train_count)
@@ -174,7 +175,7 @@ for j, minibatch in enumerate(test_loader, 0):
         y=y, 
         sequence_lengths=sequence_lenghts,
         batch_size=test_batch_size, 
-        url_set_length=url_set_length, 
+        target_vocabulary_size=target_vocabulary_size, 
         device=device)
     test_accuracies_list.append(t_acc)
 
