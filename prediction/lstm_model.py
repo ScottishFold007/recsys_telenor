@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.autograd as autograd
 
 class Model(nn.Module):
-    def __init__(self, vocabulary_size, embedding_size, output_size, device):
+    def __init__(self, vocabulary_size, embedding_size, lstm_units, output_size, device):
         super(Model, self).__init__()
-        self.hidden_dim = embedding_size
+        self.hidden_dim = lstm_units
         self.device = device 
         self.embedding = nn.Embedding(
             num_embeddings=vocabulary_size, 
@@ -14,12 +14,12 @@ class Model(nn.Module):
         )
         self.lstm = nn.LSTM(
             input_size=embedding_size, 
-            hidden_size=embedding_size, 
+            hidden_size=self.hidden_dim, 
             num_layers=2, 
             batch_first=True # dim is: batch * sequence length * features
         )
-        self.linear = nn.Linear(in_features=embedding_size, out_features=output_size)
-        self.softmax = nn.Softmax(dim=0)
+        self.linear = nn.Linear(in_features=self.hidden_dim, out_features=output_size)
+        self.softmax = nn.Softmax(dim=2)
 
 
     def init_hidden(self, minibatch_size):
@@ -41,6 +41,7 @@ class Model(nn.Module):
         pad_packed, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm, batch_first=True)
         
         linear = self.linear(pad_packed)
-        output = self.softmax(linear.squeeze())
+
+        output = self.softmax(linear)
         return output, hidden
 

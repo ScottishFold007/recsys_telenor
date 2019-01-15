@@ -44,5 +44,6 @@ def define_session(df):
     # drop all sessions with 1 event (since they are duplicates)
     df['uuid_count'] = df.groupby('UUID').UUID.transform('count')
     df = df[df.uuid_count > 1]
+    print(len(df.index))
     return df
 

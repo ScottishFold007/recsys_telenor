@@ -26,10 +26,8 @@ dataset = pd.read_csv(
 
 # take last 20 000 items
 # was 200
-#t = dataset.tail(12700)
-#t = dataset.tail(800)
-#t = dataset.tail(2000)
-t = dataset
+# t = dataset.tail(200000)
+t = dataset.tail(200000)
 
 t.columns = t.columns.str.replace('min_bedrift_event.','')
 t = t[~t.action.isnull()]

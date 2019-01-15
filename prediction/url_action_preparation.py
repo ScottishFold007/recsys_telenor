@@ -27,8 +27,6 @@ def create_target(sequence):
 
 
 def create_dataset(df, input_column, target_column):
-    import uuid # TODO: remove ugly hack 
-
     target_set = list(set(df[target_column]))
     target_set.insert(0,'ZERO PADDING')
     target_set_length = len(target_set)
@@ -53,14 +51,11 @@ def create_dataset(df, input_column, target_column):
     train = dataset[0:train_size]
     test = dataset[train_size:-1]
 
-    train.sort(key = lambda s: len(s[0]))
-    test.sort(key = lambda s: len(s[0]))
-
     return train, test, input_set_length, target_set_length
 
 def create_dataset_url_action():
     t = load_data()
-    t['url_action'] = t[['url_cleaned', 'action']].apply(lambda x: ' '.join(x), axis=1)
+    t['url_action'] = t[['url_cleaned', 'action_cleaned']].apply(lambda x: ' '.join(x), axis=1)
     return create_dataset(t, 'url_action', 'url_cleaned')
 
 def create_dataset_url():
@@ -69,6 +64,6 @@ def create_dataset_url():
 
 def create_dataset_action():
     t = load_data()
-    return create_dataset(t,'action','action')
+    return create_dataset(t,'action_cleaned','action_cleaned')
 
 

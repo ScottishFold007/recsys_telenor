@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 from tensorboardX import SummaryWriter
+import pickle
 
 from lstm_model import Model
 import url_action_preparation as uap 
@@ -90,7 +91,7 @@ def pad_minibatch(minibatch):
     return torch.LongTensor(sequences), torch.LongTensor(targets), sequence_lengths
     
 
-writer = SummaryWriter('logs') 
+writer = SummaryWriter('tensorboard_logs') 
 train_data, test_data, input_vocabulary_size, target_vocabulary_size = uap.create_dataset_action()
 
 print('input vocabulary length',input_vocabulary_size)
@@ -98,7 +99,7 @@ print('target vocabulary length',target_vocabulary_size)
 print('training size',len(train_data))
 print('test size',len(test_data))
 
-n_iters = 5
+n_iters = 50
 print_every = 5
 test_every = 1
 test_batch_size = 80
@@ -111,7 +112,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 model = Model(
     vocabulary_size=input_vocabulary_size,
-    embedding_size=10,
+    embedding_size=300,
+    lstm_units = 100,
     output_size=target_vocabulary_size, 
     device=device)
 
@@ -121,7 +123,7 @@ optimizer = optim.Adam(model.parameters())
 
 training_dataset = train_dataset.TrainDataset(train_data)
 testing_dataset = test_dataset.TestDataset(test_data)
-train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=100, collate_fn=minibatch_create_train_and_validation, shuffle=True, num_workers=4, drop_last=True)
+train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=50, collate_fn=minibatch_create_train_and_validation, shuffle=True, num_workers=4, drop_last=True)
 
 start = time.time()
 for i in range(1, n_iters + 1):
@@ -179,14 +181,25 @@ for j, minibatch in enumerate(test_loader, 0):
         device=device)
     test_accuracies_list.append(t_acc)
 
-print('test accuracy:',sum(test_accuracies_list)/len(test_accuracies_list))
+test_accuracy = sum(test_accuracies_list)/len(test_accuracies_list)
+print('test accuracy:',test_accuracy)
 plt.figure()
 plt.plot(train_accuracies_list)
 plt.savefig('img/train_acc.png')
+plt.figure()
 plt.plot(train_loss_list)
 plt.savefig('img/loss.png')
+plt.figure()
 plt.plot(validation_accuracies_list)
 plt.savefig('img/validation_acc.png')
+
+log_dict = {}
+log_dict['train_loss_list'] = train_loss_list
+log_dict['train_accuracies_list'] = train_accuracies_list
+log_dict['validation_accuracies_list'] = validation_accuracies_list
+log_dict['test_accuracy'] = test_accuracy
+with open('logs/action.p', 'wb') as f:
+    pickle.dump(log_dict, f)
 
 
   
