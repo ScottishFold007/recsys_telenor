@@ -85,9 +85,13 @@ def pad_minibatch(minibatch):
 
 #import imdb_dataset 
 #train_data, test_data, input_vocabulary_size, target_vocabulary_size = imdb_dataset.load_imdb_dataset()
-
+'''
 import ecommerce_dataset
 x_train, y_train, x_test, y_test, input_vocabulary_size, target_vocabulary_size = ecommerce_dataset.load_data()
+'''
+
+import republic
+x_train, y_train, x_test, y_test, input_vocabulary_size, target_vocabulary_size = republic.prep_republic()
 
 writer = SummaryWriter('tensorboard_logs') 
 print('input vocabulary length',input_vocabulary_size)
@@ -96,8 +100,7 @@ print('training size',len(x_train))
 print('test size',len(x_test))
 
 n_iters = 100
-print_every = 5
-test_batch_size = 80
+print_every = 1
 train_count = 0
 train_loss_list = []
 train_accuracies_list = []
@@ -117,7 +120,14 @@ loss_function = nn.CrossEntropyLoss(ignore_index=0)
 optimizer = optim.Adam(model.parameters())
 
 training_dataset = train_dataset.TrainDataset(x_train, y_train)
-train_loader = torch.utils.data.DataLoader(training_dataset, batch_size=20, collate_fn=minibatch_create_train_and_validation, shuffle=True, num_workers=4, drop_last=True)
+train_loader = torch.utils.data.DataLoader(
+    dataset=training_dataset, 
+    batch_size=100, 
+    collate_fn=minibatch_create_train_and_validation, 
+    shuffle=True, 
+    num_workers=4, 
+    drop_last=True
+)
 
 start = time.time()
 for i in range(1, n_iters + 1):
@@ -161,7 +171,14 @@ for i in range(1, n_iters + 1):
 
 # test accuracy
 testing_dataset = test_dataset.TestDataset(x_test, y_test)
-test_loader = torch.utils.data.DataLoader(testing_dataset, batch_size=test_batch_size, collate_fn=pad_minibatch, shuffle=False, num_workers=4, drop_last=True)
+test_loader = torch.utils.data.DataLoader(
+    dataset=testing_dataset, 
+    batch_size=80, 
+    collate_fn=pad_minibatch, 
+    shuffle=False, 
+    num_workers=4, 
+    drop_last=True
+)
 test_accuracies_list = []
 for j, minibatch in enumerate(test_loader, 0):
     x, y, sequence_lenghts = minibatch
@@ -170,7 +187,7 @@ for j, minibatch in enumerate(test_loader, 0):
         x=x, 
         y=y, 
         sequence_lengths=sequence_lenghts,
-        batch_size=test_batch_size, 
+        batch_size=80, 
         target_vocabulary_size=target_vocabulary_size, 
         device=device)
     test_accuracies_list.append(t_acc)
