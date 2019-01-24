@@ -2,13 +2,14 @@ from torch.utils.data import Dataset
 
 class TestDataset(Dataset):
 
-    def __init__(self, test_data):
-        self.test_data = test_data
+    def __init__(self, x_test, y_test):
+        self.x_test = x_test
+        self.y_test = y_test
 
     def __len__(self):
-        return len(self.test_data)
+        return len(self.x_test)
 
     def __getitem__(self, idx):
-        x,y = self.test_data[idx]
+        x,y = self.x_test[idx], self.y_test[idx]
         return x,y
 

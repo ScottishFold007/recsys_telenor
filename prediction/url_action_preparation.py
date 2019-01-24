@@ -23,8 +23,13 @@ def integer_encode(vocabulary, data):
 
 def create_target(sequence):
     target = sequence[1:]
-    return np.append(target,[0])
+    return np.append(target,[0]) 
 
+def split_dataset(dataset):
+    train_size = int(0.8 * len(dataset))
+    train = dataset[0:train_size]
+    test = dataset[train_size:-1]
+    return train, test
 
 def create_dataset(df, input_column, target_column):
     target_set = list(set(df[target_column]))
@@ -40,21 +45,22 @@ def create_dataset(df, input_column, target_column):
     df = df.assign(target_index=target_indices)
     df = df.assign(input_index=input_indices)
 
-    dataset = []
+    x = [] 
+    y = []
     for uuid, row in df.groupby('UUID'):
-        inputs = row['input_index'].values
-        targets = create_target(row['target_index'].values)
-        dataset.append((inputs,targets))
+        x.append(torch.LongTensor(row['input_index'].values))
+        y.append(torch.LongTensor(create_target(row['target_index'].values)))
 
     # split data into training and testing
-    train_size = int(0.8 * len(dataset))
-    train = dataset[0:train_size]
-    test = dataset[train_size:-1]
+    x_train, x_test = split_dataset(x)
+    y_train, y_test = split_dataset(y)
 
-    return train, test, input_set_length, target_set_length
+    return x_train, y_train, x_test, y_test, input_set_length, target_set_length
 
 def create_dataset_url_action():
     t = load_data()
+
+    # concat url and action
     t['url_action'] = t[['url_cleaned', 'action_cleaned']].apply(lambda x: ' '.join(x), axis=1)
     return create_dataset(t, 'url_action', 'url_cleaned')
 
