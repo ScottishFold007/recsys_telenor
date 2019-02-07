@@ -25,7 +25,6 @@ def pull_close_events_to_action(df, action, n_closest=2):
     return(tmp)
 
 
-####################################################
 # replace nan values in url - needed to avoid exception in next function
 def custom_function1(x):
     if 'globalsearch' in x.action:
