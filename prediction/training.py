@@ -151,6 +151,7 @@ for i in range(1, n_iters + 1):
         writer.add_scalar('Train/Accuracy', train_accuracy, train_count)
         train_accuracies_list.append(train_accuracy)
         train_loss_list.append(training_loss)
+        print(training_loss)
 
         # validation 
         validation_accuracy = validation(

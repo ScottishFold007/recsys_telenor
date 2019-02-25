@@ -10,6 +10,8 @@ import url_preparation as up
 
 def load_data():
     t = pickle.load( open( "./../data_set.p", "rb" ) )
+    t = t.tail(300000)
+    print(len(t.index))
     t = ss.define_session(t)
     return up.prepare_urls(t)
 
@@ -55,7 +57,7 @@ def create_dataset(df, input_column, target_column):
     x_train, x_test = split_dataset(x)
     y_train, y_test = split_dataset(y)
 
-    return x_train, y_train, x_test, y_test, input_set_length, target_set_length
+    return x_train, y_train, x_test, y_test, input_set_length, target_set_length, input_set
 
 def create_dataset_url_action():
     t = load_data()
