@@ -5,8 +5,7 @@ import torch.nn.functional as F
 class Model(nn.Module):
     """ A language model RNN with GRU layer(s). """
 
-    def __init__(self, vocab_size, embedding_dim,
-                 hidden_dim, gru_layers, tied, dropout):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, gru_layers, tied, dropout):
         super(Model, self).__init__()
         self.tied = tied
         if not tied:

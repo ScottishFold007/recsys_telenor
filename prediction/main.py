@@ -62,10 +62,11 @@ def train_epoch(data, model, optimizer, loss_func, args, device):
     #log_timer = LogTimer(5)
     losses = []
     train_accuracies = []
+    validation_accuracies = []
     for batch_ind, sents in enumerate(batches(data, args.batch_size)):
-        taining_sents, validation_sents = split_minibatch(sents)
+        taining_sents, validation_sents = split_minibatch(sents,args.validation_split_ratio)
 
-        validation_acc = validation(validation_sents, model, args.batch_size, loss_func, device)
+        validation_acc = validation(validation_sents, model, loss_func, device)
 
         model.zero_grad()
         out, loss, y = step(model, taining_sents, loss_func, device)
@@ -73,27 +74,27 @@ def train_epoch(data, model, optimizer, loss_func, args, device):
         optimizer.step()
 
         # accuracy
-        acc = calc_accuracy(out,y.data)
+        training_acc = calc_accuracy(out,y.data)
 
         # Calculate perplexity.
         prob = out.exp()[
             torch.arange(0, y.data.shape[0], dtype=torch.int64), y.data]
         perplexity = 2 ** prob.log2().neg().mean().item()
         logging.info("\tBatch %d, loss %.3f, perplexity %.2f training accuracy %.2f average validation accuracy %.2f",
-                        batch_ind, loss.item(), perplexity, acc, validation_acc)
+                        batch_ind, loss.item(), perplexity, training_acc, validation_acc)
         losses.append(loss.item())
-        train_accuracies.append(acc)
-    return losses, train_accuracies
+        train_accuracies.append(training_acc)
+        validation_accuracies.append(validation_acc)
+    return losses, train_accuracies, validation_accuracies
 
-def validation(data, model, batch_size, loss_func, device):
+def validation(data, model, loss_func, device):
     model.eval()
     with torch.no_grad():
-        acc_sum = 0.0
-        for sents in batches(data, batch_size):
-            out, _, y = step(model, sents, loss_func, device)
-            acc_sum += calc_accuracy(out,y.data)
+        out, _, y = step(model, data, loss_func, device)
+        validation_accuracy = calc_accuracy(out,y.data)
         model.train()
-        return acc_sum/len(data)
+        return validation_accuracy
+
 
 def evaluate(data, model, batch_size, device):
     """ Perplexity of the given data with the given model. """
@@ -109,8 +110,8 @@ def evaluate(data, model, batch_size, device):
             word_count += y.data.shape[0]
     return 2 ** (entropy_sum / word_count)
 
-def split_minibatch(minibatch):
-    train_size = int(0.8 * len(minibatch))
+def split_minibatch(minibatch,split_ratio):
+    train_size = int(split_ratio * len(minibatch))
     return minibatch[0:train_size], minibatch[train_size:-1]
 
 def parse_args(args):
@@ -128,8 +129,10 @@ def parse_args(args):
                       help="Number of GRU layers")
     argp.add_argument("--gru-dropout", type=float, default=0.0,
                       help="The amount of dropout in GRU layers")
+    argp.add_argument("--validation-split-ratio", type=float, default=0.8,
+                      help="percentage of minibatch used for training")
 
-    argp.add_argument("--epochs", type=int, default=20)
+    argp.add_argument("--epochs", type=int, default=1)
     argp.add_argument("--batch-size", type=int, default=128)
     argp.add_argument("--lr", type=float, default=0.001,
                       help="Learning rate")
@@ -143,6 +146,10 @@ def main(args=sys.argv[1:]):
     logging.basicConfig(level=args.logging)
 
     #device = torch.device("cpu")
+
+    t_size = int(args.validation_split_ratio * args.batch_size)
+    v_size = args.batch_size - t_size
+    print('training size',t_size,'validation size',v_size)
 
 
     x_train, y_train, x_test, y_test, input_vocabulary_size, target_vocabulary_size, vocab = uap.create_dataset_action()
@@ -165,14 +172,24 @@ def main(args=sys.argv[1:]):
 
     loss_per_batch = []
     loss_per_epoch = []
-
+    training_accuracy_per_batch = []
+    validation_accuracy_per_batch = []
 
     for epoch_ind in range(args.epochs):
         logging.info("Training epoch %d", epoch_ind)
-        l, a = train_epoch(train_data, model, optimizer, loss_func, args, device)
+        l, train_accuracy, validation_accuracy = train_epoch(train_data, model, optimizer, loss_func, args, device)
         loss_per_batch.extend(l)
         loss_per_epoch.append(sum(l)/len(l))
+        training_accuracy_per_batch.extend(train_accuracy)
+        validation_accuracy_per_batch.extend(validation_accuracy)
+
+    print(len(x_test))
+    x_test.sort(key=lambda l: len(l), reverse=True)
+    test_set_longtensor = [torch.LongTensor(s) for s in x_test]
+    test_accuracy = validation(test_set_longtensor, model, loss_func, device)
+    print(test_accuracy)
     
+
     # ploting
     plt.figure()
     plt.plot(loss_per_batch)
@@ -180,6 +197,12 @@ def main(args=sys.argv[1:]):
     plt.figure()
     plt.plot(loss_per_epoch)
     plt.savefig('img/loss_per_epoch.pdf')
+    plt.figure()
+    plt.plot(training_accuracy_per_batch)
+    plt.savefig('img/training_accuracy_per_batch.pdf')
+    plt.figure()
+    plt.plot(validation_accuracy_per_batch)
+    plt.savefig('img/validation_accuracy_per_batch.pdf')
 
     # save results 
     log_dict = {}
