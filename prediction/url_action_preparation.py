@@ -2,6 +2,7 @@ import pickle
 from datetime import datetime as dt
 import torch
 import numpy as np
+import random
 
 import sys
 sys.path.insert(0, './../preprocessing')
@@ -9,11 +10,13 @@ import session as ss
 import url_preparation as up
 
 def load_data():
-    t = pickle.load( open( "./../data_set.p", "rb" ) )
-    t = t.tail(300000)
+    t = pickle.load( open( "./cleaned_dataset.p", "rb" ) )
+    #t = ss.define_session(t)
+    #t = up.prepare_urls(t)
+    #t = t.tail(20000)
     print(len(t.index))
-    t = ss.define_session(t)
-    return up.prepare_urls(t)
+    return t
+
 
 def integer_encode(vocabulary, data):
     # mapping from urls to int
@@ -23,41 +26,28 @@ def integer_encode(vocabulary, data):
     integer_encoded = [string_to_int[s] for s in data]
     return integer_encoded
 
-def create_target(sequence):
-    target = sequence[1:]
-    return np.append(target,[0]) 
-
 def split_dataset(dataset):
-    train_size = int(0.8 * len(dataset))
+    random.shuffle(dataset)
+    train_size = int(0.5 * len(dataset))
     train = dataset[0:train_size]
     test = dataset[train_size:-1]
     return train, test
 
 def create_dataset(df, input_column, target_column):
-    target_set = list(set(df[target_column]))
-    target_set.insert(0,'ZERO PADDING')
-    target_set_length = len(target_set)
     
-    input_set = list(set(df[input_column]))
-    input_set.insert(0,'ZERO PADDING')
-    input_set_length = len(input_set)
+    vocab = list(set(df[input_column]))
     
-    input_indices = integer_encode(input_set, df[input_column])
-    target_indices = integer_encode(target_set,df[target_column])
-    df = df.assign(target_index=target_indices)
+    input_indices = integer_encode(vocab, df[input_column])
     df = df.assign(input_index=input_indices)
 
     x = [] 
-    y = []
     for uuid, row in df.groupby('UUID'):
         x.append(torch.LongTensor(row['input_index'].values))
-        y.append(torch.LongTensor(create_target(row['target_index'].values)))
 
     # split data into training and testing
     x_train, x_test = split_dataset(x)
-    y_train, y_test = split_dataset(y)
 
-    return x_train, y_train, x_test, y_test, input_set_length, target_set_length, input_set
+    return x_train, x_test, vocab
 
 def create_dataset_url_action():
     t = load_data()
@@ -73,5 +63,18 @@ def create_dataset_url():
 def create_dataset_action():
     t = load_data()
     return create_dataset(t,'action_cleaned','action_cleaned')
+
+def save_dataset():
+    x_train, x_test, vocab = create_dataset_action()
+    d = {}
+    d['x_train'] = x_train
+    d['x_test'] = x_test
+    d['vocab'] = vocab
+    with open('prepared_dataset.p', 'wb') as f:
+        pickle.dump(d, f)
+
+save_dataset()
+
+
 
 

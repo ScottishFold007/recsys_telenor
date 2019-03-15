@@ -1,7 +1,16 @@
+from datetime import datetime as dt
+import uuid 
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 import pickle
-import pandas as pd 
 
-in_path = './../../'
+import sys
+sys.path.insert(0, './../preprocessing')
+import session as ss
+
+in_path = './../../../'
 dataset = pd.read_csv(
     in_path+'splunk_data_180918_telenor_processed.txt',  
     encoding="ISO-8859-1", 
@@ -23,17 +32,23 @@ dataset = pd.read_csv(
         "session_duration":float
     }
 )
-
-# take last 20 000 items
-# was 200
-t = dataset.tail(1100000)
-#t = dataset 
-
+t = dataset
 t.columns = t.columns.str.replace('min_bedrift_event.','')
 t = t[~t.action.isnull()]
 
 # drop NaN actions or urls
 t = t.dropna(axis='rows', how='any',subset=['url', 'action'])
-t = t.reset_index()
+print(len(t.index))
 
-pickle.dump( t, open( "data_set.p", "wb" ) )
+t = ss.define_session(t)
+
+print('sessions defined')
+
+def remove(s):
+    s = s.loc[s.action_cleaned.shift() != s.action_cleaned]
+    return s
+
+t = t.groupby(['UUID','start_time']).apply(remove)
+
+with open('cleaned_dataset.p', 'wb') as f:
+    pickle.dump(t, f)
