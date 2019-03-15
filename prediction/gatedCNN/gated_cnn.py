@@ -68,4 +68,4 @@ class GatedCNN(nn.Module):
         out = self.fc(h) # (bs, ans_size)
         out = F.log_softmax(out)
 
-return out
+        return out

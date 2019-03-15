@@ -17,8 +17,8 @@ out_chs         = 64
 res_block_count = 5
 batch_size      = 64
 
-
-words = read_words('./data', seq_len, kernel[0])
+filename = './../../../1-billion-word-language-modeling-benchmark-r13output/training-monolingual.tokenized.shuffled'
+words = read_words(filename, seq_len, kernel[0])
 word_counter = collections.Counter(words).most_common(vocab_size-1)
 vocab = [w for w, _ in word_counter]
 w2i = dict((w, i) for i, w in enumerate(vocab, 1))
