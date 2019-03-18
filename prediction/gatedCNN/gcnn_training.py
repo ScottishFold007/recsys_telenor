@@ -1,32 +1,49 @@
 import collections
 import random
 
+import pickle
+
 import torch
 import torch.nn as nn
 
 from utils import read_words, create_batches, to_var
 from gated_cnn import GatedCNN
 
+def load_dataset():
+    d = pickle.load( open( "./../prepared_dataset.p", "rb" ) )
+    return d['x_train'], d['vocab']
 
-vocab_size      = 2000
-seq_len         = 21
-embd_size       = 200
+sessions, vocab = load_dataset()
+w2i = dict((w, i) for i, w in enumerate(vocab, 1))
+w2i['<unk>'] = 0
+data = []
+for s in sessions:
+    data.append([w2i[w] if w in w2i else 0 for w in s])
+
+print(len(data))
+print(len(data[0]))
+
+
+print('vocab_size', len(vocab))
+vocab_size      = len(vocab)
+seq_len         = len(max(sessions,key=len))
+embd_size       = 100
 n_layers        = 10
 kernel          = (5, embd_size)
 out_chs         = 64
 res_block_count = 5
 batch_size      = 64
 
+'''
 filename = './../../../1-billion-word-language-modeling-benchmark-r13output/training-monolingual.tokenized.shuffled'
 words = read_words(filename, seq_len, kernel[0])
 word_counter = collections.Counter(words).most_common(vocab_size-1)
 vocab = [w for w, _ in word_counter]
-w2i = dict((w, i) for i, w in enumerate(vocab, 1))
-w2i['<unk>'] = 0
-print('vocab_size', vocab_size)
-print('w2i size', len(w2i))
+'''
 
-data = [w2i[w] if w in w2i else 0 for w in words]
+# = dict((w, i) for i, w in enumerate(vocab, 1))
+#print('w2i size', len(w2i))
+#data = [w2i[w] if w in w2i else 0 for w in words]
 data = create_batches(data, batch_size, seq_len)
 split_idx = int(len(data) * 0.8)
 training_data = data[:split_idx]
@@ -48,6 +65,8 @@ def train(model, data, test_data, optimizer, loss_fn, n_epoch=10):
             # print(X)
             pred = model(X) # (bs, ans_size)
             # _, pred_ids = torch.max(pred, 1)
+            print(pred.shape,Y.shape)
+            print(X.shape)
             loss = loss_fn(pred, Y)
             if batch_ct % 100 == 0:
                 print('loss: {:.4f}'.format(loss.data[0]))

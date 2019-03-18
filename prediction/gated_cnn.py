@@ -18,7 +18,6 @@ class GatedCNN(nn.Module):
                  res_block_count,
                  ans_size):
         super(GatedCNN, self).__init__()
-        self.ans_size = ans_size
         self.res_block_count = res_block_count
         # self.embd_size = embd_size
 
@@ -35,7 +34,7 @@ class GatedCNN(nn.Module):
         self.b = nn.ParameterList([nn.Parameter(torch.randn(1, out_chs, 1, 1)) for _ in range(n_layers)])
         self.c = nn.ParameterList([nn.Parameter(torch.randn(1, out_chs, 1, 1)) for _ in range(n_layers)])
 
-        self.fc = nn.Linear(out_chs*seq_len, ans_size*seq_len)
+        self.fc = nn.Linear(out_chs*seq_len, ans_size)
 
     def forward(self, x):
         # x: (N, seq_len)
@@ -43,10 +42,11 @@ class GatedCNN(nn.Module):
         # Embedding
         bs = x.size(0) # batch size
         seq_len = x.size(1)
-        x = self.embedding(x) # (bs, seq_len, embd_size)
+        x = nn.utils.rnn.PackedSequence(self.embedding(x.data), x.batch_sizes)
+        #x = self.embedding(x) # (bs, seq_len, embd_size)
 
         # CNN
-        x = x.unsqueeze(1) # (bs, Cin, seq_len, embd_size), insert Channnel-In dim
+        #x = x.unsqueeze(1) # (bs, Cin, seq_len, embd_size), insert Channnel-In dim
         # Conv2d
         #    Input : (bs, Cin,  Hin,  Win )
         #    Output: (bs, Cout, Hout, Wout)
@@ -64,10 +64,8 @@ class GatedCNN(nn.Module):
             if i % self.res_block_count == 0: # size of each residual block
                 h += res_input
                 res_input = h
-        print(h.shape)
-        #h = h.view(bs, -1) # (bs, Cout*seq_len)
-        h = h.view(bs,self.ans_size,-1)
-        print(h.shape)
+
+        h = h.view(bs, -1) # (bs, Cout*seq_len)
         out = self.fc(h) # (bs, ans_size)
         out = F.log_softmax(out)
 

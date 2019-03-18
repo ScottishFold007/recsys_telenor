@@ -18,13 +18,32 @@ def read_words(data_dir, seq_len, filter_h):
 
     return words
 
-
+'''
 def create_batches(data, batch_size, seq_len):
     ret_data = []
     X, Y = [], []
     for i in range(0, len(data)-(seq_len+1), seq_len):
         X.append(data[i:i+seq_len])
         Y.append(data[i+seq_len])
+    for i in range(0, len(X)-batch_size, batch_size):
+        ret_data.append((X[i:i+batch_size], Y[i:i+batch_size]))
+    return ret_data
+'''
+
+def create_batches(data, batch_size, seq_len):
+    padded = [] 
+    
+    for s in data:
+        pad_len = seq_len - len(s)
+        for i in range(pad_len):
+            s.append(0)
+        padded.append(s)
+    
+        
+    ret_data = []
+    X = padded[:-1]
+    Y = padded[1:]
+   
     for i in range(0, len(X)-batch_size, batch_size):
         ret_data.append((X[i:i+batch_size], Y[i:i+batch_size]))
     return ret_data
