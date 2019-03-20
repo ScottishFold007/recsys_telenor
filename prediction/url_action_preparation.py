@@ -49,6 +49,26 @@ def create_dataset(df, input_column, target_column):
 
     return x_train, x_test, vocab
 
+'''
+def create_per_user_dataset(df, input_column, target_column):
+    
+    vocab = list(set(df[input_column]))
+    
+    input_indices = integer_encode(vocab, df[input_column])
+    df = df.assign(input_index=input_indices)
+    
+    user_sessions = []
+    sessions = []
+    for i, user in df.groupby('user'):
+        for uuid, row in df.groupby('UUID'):
+        x.append(torch.LongTensor(row['input_index'].values))
+
+    # split data into training and testing
+    x_train, x_test = split_dataset(x)
+
+    return x_train, x_test, vocab
+'''
+
 def create_dataset_url_action():
     t = load_data()
 
