@@ -10,8 +10,8 @@ class Model(nn.Module):
         self.tied = tied
         if not tied:
             self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        #self.gru = nn.GRU(input_size=embedding_dim, hidden_size=hidden_dim, num_layers=gru_layers, dropout=dropout)
-        self.lstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, num_layers=gru_layers, dropout=dropout)
+        self.gru = nn.GRU(input_size=embedding_dim, hidden_size=hidden_dim, num_layers=gru_layers, dropout=dropout)
+        #self.lstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, num_layers=gru_layers, dropout=dropout)
         self.fc1 = nn.Linear(hidden_dim, vocab_size)
         self.hidden_dim = hidden_dim
 
@@ -21,7 +21,7 @@ class Model(nn.Module):
         else:
             return self.embedding(word_indexes)
 
-    def forward(self, packed_sents, hidden=None):
+    def forward(self, packed_sents):
         """ Takes a PackedSequence of sentences tokens that has T tokens
         belonging to vocabulary V. Outputs predicted log-probabilities
         for the token following the one that's input in a tensor shaped
@@ -29,13 +29,18 @@ class Model(nn.Module):
         """
         embedded_sents = nn.utils.rnn.PackedSequence(self.get_embedded(packed_sents.data), packed_sents.batch_sizes)
         #out_packed_sequence, _ = self.gru(embedded_sents)
-        if hidden != None:
-            out_packed_sequence, (h,c) = self.lstm(embedded_sents, hidden)
-        else:
-            out_packed_sequence, (h,c) = self.lstm(embedded_sents)
+        '''
+        out_packed_sequence, (h,c) = self.gru(embedded_sents)
 
         lasthidden = (h[-1,:,:].unsqueeze(dim=0).detach(), c[-1,:,:].unsqueeze(dim=0).detach())
+        '''
+        out_packed_sequence, hidden = self.gru(embedded_sents)
 
+        #print('lstm out shape',out_packed_sequence.data.shape)
+        #print('hidden shape', hidden.shape)
+
+        lasthidden = hidden[-1,:,:].unsqueeze(dim=0).detach()
+        
         out = self.fc1(out_packed_sequence.data)
 
         return F.log_softmax(out, dim=1), lasthidden

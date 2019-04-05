@@ -22,6 +22,7 @@ import torch.optim as optim
 import numpy as np
 from gru_model_chat import Model
 
+
 def load_dataset():
     d = pickle.load( open( "./prepared_dataset.p", "rb" ) )
     return d['x_train'], d['vocab']
@@ -36,6 +37,7 @@ def batches(data, batch_size):
         yield [torch.LongTensor(s) for s in sentences]
 
 
+
 def training_step(model, sents, loss_func, device, hidden):
     """ Performs a model inference for the given model and sentence batch.
     Returns the model otput, total loss and target outputs. """
@@ -43,8 +45,11 @@ def training_step(model, sents, loss_func, device, hidden):
     y = nn.utils.rnn.pack_sequence([s[1:] for s in sents])
     if device.type == 'cuda':
         x, y = x.cuda(), y.cuda()
-    out, hidden = model(x, hidden)
+    out, hidden = model(x)
+    #print(out.shape,y.data.shape)
     #F.nll_loss(out, y.data)
+    #print(type(out))
+    #print(out.shape)
     loss = loss_func(out, y.data)
     return out, loss, y, hidden
 
@@ -95,6 +100,10 @@ def train_epoch(data, model, optimizer, loss_func, args, device):
         out, loss, y, hidden = training_step(model, taining_sents, loss_func, device, hidden)
         loss.backward()
         optimizer.step()
+
+        print(len(data[batch_ind:args.batch_size]), data[batch_ind:args.batch_size])
+
+        chat_y = torch.LongTensor([1 if 199 in s else 0 for s in taining_sents])
 
         # accuracy
         training_acc = calc_accuracy(out,y.data)
@@ -181,18 +190,19 @@ def main(args=sys.argv[1:]):
     train_data, vocab = load_dataset() 
     train_data = train_data[0:200]
     device = torch.device("cpu" if args.no_cuda or not torch.cuda.is_available() else "cuda")
-    
-    
 
-    
+    start_chat_index = vocab.index('start_chat')
+
     print('num sessions',len(train_data))
     print('vocab size',len(vocab))
     model = Model(len(vocab), args.embedding_dim,
                   args.gru_hidden, args.gru_layers,
                   not args.untied, args.gru_dropout).to(device)
 
+
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     loss_func = nn.CrossEntropyLoss()
+
 
     loss_per_batch = []
     training_accuracy_per_batch = []
@@ -214,7 +224,6 @@ def main(args=sys.argv[1:]):
 
     
     del model
-
 
 
     # ploting
