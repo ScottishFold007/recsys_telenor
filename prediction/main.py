@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-from gru_model import Model
+from model import Model
 
 def load_dataset():
     #d = pickle.load( open( "./data/long_sessions_2.p", "rb" ) )

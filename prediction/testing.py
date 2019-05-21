@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import random
 import numpy as np
-from gru_model import Model
+from model import Model
 
 def load_dataset():
     #d = pickle.load( open( "./data/short_sessions.p", "rb" ) )
