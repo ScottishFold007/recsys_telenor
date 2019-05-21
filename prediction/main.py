@@ -2,10 +2,8 @@
 # -*- coding: UTF-8 -*-
 
 """
-Trains and evaluates an RNN language model written using
-PyTorch v0.4. Illustrates how to combine a batched, non-padded
-variable length data input with torch.nn.Embedding and how to
-use tied input and output word embeddings.
+Trains a RNN model for next interaction prediction.
+Combines a batched, non-padded variable length data input with torch.nn.Embedding.
 """
 
 from argparse import ArgumentParser
@@ -23,8 +21,10 @@ import numpy as np
 from gru_model import Model
 
 def load_dataset():
-    d = pickle.load( open( "./prepared_dataset.p", "rb" ) )
-    return d['x_train'], d['vocab']
+    #d = pickle.load( open( "./data/long_sessions_2.p", "rb" ) )
+    #d = pickle.load( open( "./data/long.p", "rb" ) )
+    d = pickle.load( open( "./data/prepared_dataset_for_pretrained_emb.p", "rb" ) )
+    return d['x_train'], d['vocab'], d['pre_trained_embeddings']
 
 
 def batches(data, batch_size):
@@ -44,7 +44,6 @@ def training_step(model, sents, loss_func, device):
     if device.type == 'cuda':
         x, y = x.cuda(), y.cuda()
     out = model(x)
-    #F.nll_loss(out, y.data)
     loss = loss_func(out, y.data)
     return out, loss, y
 
@@ -143,10 +142,8 @@ def parse_args(args):
     argp.add_argument("--logging", choices=["INFO", "DEBUG"],
                       default="INFO")
 
-    argp.add_argument("--embedding-dim", type=int, default=100,
+    argp.add_argument("--embedding-dim", type=int, default=20,
                       help="Word embedding dimensionality")
-    argp.add_argument("--untied", action="store_true",
-                      help="Use untied input/output embedding weights")
     argp.add_argument("--gru-hidden", type=int, default=100,
                       help="GRU gidden unit dimensionality")
 
@@ -158,7 +155,7 @@ def parse_args(args):
                       help="percentage of minibatch used for training")
 
     argp.add_argument("--epochs", type=int, default=20)
-    argp.add_argument("--batch-size", type=int, default=100)
+    argp.add_argument("--batch-size", type=int, default=200)
     argp.add_argument("--lr", type=float, default=0.001,
                       help="Learning rate")
 
@@ -174,20 +171,12 @@ def main(args=sys.argv[1:]):
 
     t_size = int(args.validation_split_ratio * args.batch_size)
     v_size = args.batch_size - t_size
-    print('training size',t_size,'validation size',v_size)
 
 
-    train_data, vocab = load_dataset() 
+    train_data, vocab, pre_trained_embeddings = load_dataset() 
     device = torch.device("cpu" if args.no_cuda or not torch.cuda.is_available() else "cuda")
     
-    
-
-    
-    print('num sessions',len(train_data))
-    print('vocab size',len(vocab))
-    model = Model(len(vocab), args.embedding_dim,
-                  args.gru_hidden, args.gru_layers,
-                  not args.untied, args.gru_dropout).to(device)
+    model = Model(214, args.embedding_dim, args.gru_hidden, args.gru_layers, args.gru_dropout, pre_trained_embeddings).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     loss_func = nn.CrossEntropyLoss()
@@ -198,7 +187,7 @@ def main(args=sys.argv[1:]):
     training_perplexities_per_batch = []
     training_precission_per_batch = []
 
-
+    
     for epoch_ind in range(args.epochs):
         logging.info("Training epoch %d", epoch_ind)
         l, train_accuracy, validation_accuracy, p, prec = train_epoch(train_data, model, optimizer, loss_func, args, device)
@@ -210,9 +199,13 @@ def main(args=sys.argv[1:]):
 
     torch.save(model.state_dict(), './state_dict.pth')
 
+    '''
+    params = list(model.parameters())
+    with open('embeddings.p', 'wb') as f:
+        pickle.dump((params[0].data, vocab), f)
+    '''
     
     del model
-
 
 
     # ploting
@@ -237,6 +230,8 @@ def main(args=sys.argv[1:]):
     log_dict['loss_per_batch'] = loss_per_batch
     with open('logs/action.p', 'wb') as f:
         pickle.dump(log_dict, f)
+    
+    
 
 
 if __name__ == '__main__':

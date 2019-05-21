@@ -16,10 +16,14 @@ def model_to_CSV(model, embedding_size):
         labels.append(word)
     tokens_df = pd.DataFrame(tokens)
     labels_df = pd.DataFrame(labels)
-    #tokens_df.to_csv('word2vec_embeddings/embedding_%d.csv' % embedding_size,sep='\t', index=False, header=None)
-    #labels_df.to_csv('word2vec_embeddings/labels_%d.csv' % embedding_size,sep='\t', index=False, header=None)
-    tokens_df.to_csv('word2vec_preprocessed_embeddings/embedding_%d.csv' % embedding_size,sep='\t', index=False, header=None)
-    labels_df.to_csv('word2vec_preprocessed_embeddings/labels_%d.csv' % embedding_size,sep='\t', index=False, header=None)
+    tokens_df.to_csv('word2vec_embeddings/embedding_%d.csv' % embedding_size,sep='\t', index=False, header=None)
+    labels_df.to_csv('word2vec_embeddings/labels_%d.csv' % embedding_size,sep='\t', index=False, header=None)
+    #tokens_df.to_csv('word2vec_preprocessed_embeddings/embedding_%d.csv' % embedding_size,sep='\t', index=False, header=None)
+    #labels_df.to_csv('word2vec_preprocessed_embeddings/labels_%d.csv' % embedding_size,sep='\t', index=False, header=None)
+
+   
+    with open('w2v.p', 'wb') as f:
+        pickle.dump(model, f)
 
 df = pickle.load(open("./../data_set.p", "rb"))
 
@@ -40,7 +44,7 @@ total_examples = len(corpus)
 print('num sessions', total_examples)
 print('total num events',len(d))    
 
-embedding_size = 110
+embedding_size = 20
 
 model = gensim.models.Word2Vec(corpus, size=embedding_size, window=3, min_count=2, workers=10)
 

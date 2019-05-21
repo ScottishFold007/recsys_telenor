@@ -2,7 +2,7 @@ import pickle
 import pandas as pd 
 
 in_path = './../../'
-dataset = pd.read_csv(
+t = pd.read_csv(
     in_path+'splunk_data_180918_telenor_processed.txt',  
     encoding="ISO-8859-1", 
     dtype={
@@ -24,10 +24,6 @@ dataset = pd.read_csv(
     }
 )
 
-# take last 20 000 items
-# was 200
-t = dataset.tail(1100000)
-#t = dataset 
 
 t.columns = t.columns.str.replace('min_bedrift_event.','')
 t = t[~t.action.isnull()]
