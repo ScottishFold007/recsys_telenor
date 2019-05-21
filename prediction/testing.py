@@ -7,9 +7,9 @@ from model import Model
 
 def load_dataset():
     #d = pickle.load( open( "./data/short_sessions.p", "rb" ) )
-    #d = pickle.load( open( "./data/prepared_dataset.p", "rb" ) )
-    d = pickle.load( open( "./data/prepared_dataset_for_pretrained_emb.p", "rb" ) )
-    return d['x_test'], d['vocab'], d['pre_trained_embeddings']
+    d = pickle.load( open( "./data/prepared_dataset.p", "rb" ) )
+    #d = pickle.load( open( "./data/prepared_dataset_for_pretrained_emb.p", "rb" ) )
+    return d['x_test'], d['vocab'] #, d['pre_trained_embeddings']
 
 def batches(data, batch_size):
     """ Yields batches of sentences from 'data', ordered on length. """
@@ -43,8 +43,9 @@ def topk_accuracy(output_distribution, targets, k):
 
 def test_accuracy():
     device = torch.device("cpu" if not torch.cuda.is_available() else "cuda")
-    x_test, vocab, pre_trained_embeddings = load_dataset()
-    model = Model(vocab_size=214, embedding_dim=20, hidden_dim=100, gru_layers=1, dropout=0.0, pre_trained_embeddings=pre_trained_embeddings)
+    x_test, vocab = load_dataset()
+    print(len(x_test))
+    model = Model(vocab_size=214, embedding_dim=20, hidden_dim=100, gru_layers=1, dropout=0.0)
     batch_size = 200
     model.load_state_dict(torch.load('./state_dict.pth'))
     model.eval()

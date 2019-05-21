@@ -5,7 +5,7 @@ import torch.nn.functional as F
 class Model(nn.Module):
     """ A RNN model for next interaction prediction. """
 
-    def __init__(self, vocab_size, embedding_dim, hidden_dim, gru_layers, dropout, pre_trained_embeddings):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, gru_layers, dropout):
         super(Model, self).__init__()
         #self.embedding = self.embedding, embedding_dim = self.create_emb_layer(pre_trained_embeddings, True) 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)

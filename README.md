@@ -25,7 +25,7 @@ Prepreprocessing of the dataset have been carried out in several steps.
 read_data_set.py: Reads the data from file into a pandas dataframe and removes empty rows.  
 preprocessing/preprocess_v1.py: Creating general descriptive action labels.  
 preprocessing/session.py: Defines a unique ID for each session and splits long sessions.  
-data_analysis/consecutive_actions_per_session.ipynb: Removes consecutive repeating actions from the sessions an removes sessions with only one action.
+data_analysis/consecutive_actions_per_session.ipynb: Removes consecutive repeating actions from the sessions and removes sessions with only one action.
 
 ## Experiments
 data_analysis/lda/actions_lda.ipynb: LDA model for creating a topic model of the interactions in sessions.  

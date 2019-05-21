@@ -23,8 +23,9 @@ from model import Model
 def load_dataset():
     #d = pickle.load( open( "./data/long_sessions_2.p", "rb" ) )
     #d = pickle.load( open( "./data/long.p", "rb" ) )
-    d = pickle.load( open( "./data/prepared_dataset_for_pretrained_emb.p", "rb" ) )
-    return d['x_train'], d['vocab'], d['pre_trained_embeddings']
+    #d = pickle.load( open( "./data/prepared_dataset_for_pretrained_emb.p", "rb" ) )
+    d = pickle.load( open( "data/prepared_dataset.p", "rb" ) )
+    return d['x_train'], d['vocab'] #, d['pre_trained_embeddings']
 
 
 def batches(data, batch_size):
@@ -173,10 +174,10 @@ def main(args=sys.argv[1:]):
     v_size = args.batch_size - t_size
 
 
-    train_data, vocab, pre_trained_embeddings = load_dataset() 
+    train_data, vocab = load_dataset() 
     device = torch.device("cpu" if args.no_cuda or not torch.cuda.is_available() else "cuda")
     
-    model = Model(214, args.embedding_dim, args.gru_hidden, args.gru_layers, args.gru_dropout, pre_trained_embeddings).to(device)
+    model = Model(214, args.embedding_dim, args.gru_hidden, args.gru_layers, args.gru_dropout).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     loss_func = nn.CrossEntropyLoss()
@@ -203,10 +204,9 @@ def main(args=sys.argv[1:]):
     params = list(model.parameters())
     with open('embeddings.p', 'wb') as f:
         pickle.dump((params[0].data, vocab), f)
-    '''
     
     del model
-
+    '''
 
     # ploting
     plt.figure()

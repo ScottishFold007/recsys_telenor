@@ -14,6 +14,7 @@ def load_data():
     Each row is a tupple of containing interaction and additional context data.
     '''
     t = pickle.load( open( "./data/cleaned_dataset.p", "rb" ) )
+    print(len(t.index))
     return t
 
 
@@ -54,6 +55,7 @@ def create_dataset_action():
 
 def save_dataset():
     x_train, x_test, vocab = create_dataset_action()
+    print(len(x_train))
     d = {}
     d['x_train'] = x_train
     d['x_test'] = x_test
